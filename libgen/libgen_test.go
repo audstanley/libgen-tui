@@ -34,5 +34,6 @@ func TestArticleScientific(t *testing.T) {
 	search.DoSearch = false
 	query := "Distributed execution of communicating sequential process-style concurrency: Golang case study"
 	search.Search("Scientific", query)
-	assert.Exactly(t, *search.Fiction, fictionPre+strings.ReplaceAll(query, " ", "+"))
+	var expected string = scientificPre + strings.ReplaceAll(query, " ", "+")
+	assert.Exactly(t, *search.Scientific, expected)
 }
