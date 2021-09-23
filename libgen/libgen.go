@@ -18,7 +18,7 @@ type LibGenSearch struct {
 	scientificTitle *string
 	pages           *[]string
 	pageLinks       *[]string
-	SearchType      string
+	SearchType      *string
 	SavePng         bool
 	DoSearch        bool
 }
@@ -32,7 +32,7 @@ func New() *LibGenSearch {
 	st := ""
 	p := []string{}
 	pl := []string{}
-	searchtp := ""
+	SearchType := ""
 	SavePng := false
 	DoSearch := true
 	return &LibGenSearch{
@@ -44,7 +44,7 @@ func New() *LibGenSearch {
 		scientificTitle: &st,
 		pages:           &p,
 		pageLinks:       &pl,
-		SearchType:      searchtp,
+		SearchType:      &SearchType,
 		SavePng:         SavePng,
 		DoSearch:        DoSearch,
 	}
@@ -125,11 +125,11 @@ func (search LibGenSearch) scientificSearch() {
 // This is a helper function for if you are tyring to parse the html into
 // a GoLang struct
 func (search LibGenSearch) saveElmentTextToLog(str string) {
-	err := os.WriteFile(fmt.Sprintf("rod-%s-%s.html", search.SearchType, search.GetTitle()), []byte("\n"), 0644)
+	err := os.WriteFile(fmt.Sprintf("rod-%s-%s.html", *search.SearchType, search.GetTitle()), []byte("\n"), 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
-	file, err := os.OpenFile(fmt.Sprintf("rod-%s-%s.html", search.SearchType, search.GetTitle()), os.O_APPEND|os.O_WRONLY, 0644)
+	file, err := os.OpenFile(fmt.Sprintf("rod-%s-%s.html", *search.SearchType, search.GetTitle()), os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		log.Println(err)
 	}
@@ -154,8 +154,9 @@ func (search LibGenSearch) Search(searchType string, q string) {
 		log.Fatal("You are making an empty search to libgen")
 		os.Exit(1)
 	}
-	search.SearchType = searchType
-	switch search.SearchType {
+	*search.SearchType = searchType
+	fmt.Println("the search type is:", *search.SearchType)
+	switch *search.SearchType {
 	case "Fiction":
 		search.fictionSearchString(q)
 		search.fictionSearch()
@@ -172,7 +173,7 @@ func (search LibGenSearch) Search(searchType string, q string) {
 }
 
 func (search LibGenSearch) GetTitle() string {
-	switch search.SearchType {
+	switch *search.SearchType {
 	case "Fiction":
 		return *search.fictionTitle
 	case "NonFiction":
@@ -180,7 +181,7 @@ func (search LibGenSearch) GetTitle() string {
 	case "Scientific":
 		return *search.scientificTitle
 	default:
-		log.Fatal("The defaults for getTile are [Fiction, NonFiction, and Scientific]")
+		log.Fatal("The defaults for GetTile are [Fiction, NonFiction, and Scientific] not:", *search.SearchType)
 		return ""
 	}
 }
