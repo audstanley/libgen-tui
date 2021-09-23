@@ -1,7 +1,6 @@
 package libgen_test
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/audstanley/libgen-tui/libgen"
@@ -18,7 +17,7 @@ func TestBookNonFiction(t *testing.T) {
 	search.DoSearch = false
 	query := "Mastering Golang"
 	search.Search("NonFiction", query)
-	assert.Exactly(t, *search.NonFiction, nonFictionPre+strings.ReplaceAll(query, " ", "+")+nonFictionPost)
+	assert.Exactly(t, *search.NonFiction, nonFictionPre+search.GetTitle()+nonFictionPost)
 }
 
 func TestBookFiction(t *testing.T) {
@@ -26,7 +25,7 @@ func TestBookFiction(t *testing.T) {
 	search.DoSearch = false
 	query := "Game of Thrones"
 	search.Search("Fiction", query)
-	assert.Exactly(t, *search.Fiction, fictionPre+strings.ReplaceAll(query, " ", "+"))
+	assert.Exactly(t, *search.Fiction, fictionPre+search.GetTitle())
 }
 
 func TestArticleScientific(t *testing.T) {
@@ -34,6 +33,6 @@ func TestArticleScientific(t *testing.T) {
 	search.DoSearch = false
 	query := "Distributed execution of communicating sequential process-style concurrency: Golang case study"
 	search.Search("Scientific", query)
-	var expected string = scientificPre + strings.ReplaceAll(query, " ", "+")
+	var expected string = scientificPre + search.GetTitle()
 	assert.Exactly(t, *search.Scientific, expected)
 }

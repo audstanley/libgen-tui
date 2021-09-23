@@ -10,34 +10,43 @@ import (
 )
 
 type LibGenSearch struct {
-	NonFiction *string
-	Fiction    *string
-	Scientific *string
-	pages      *[]string
-	pageLinks  *[]string
-	SearchType string
-	SavePng    bool
-	DoSearch   bool
+	NonFiction      *string
+	nonFictionTitle *string
+	Fiction         *string
+	fictionTitle    *string
+	Scientific      *string
+	scientificTitle *string
+	pages           *[]string
+	pageLinks       *[]string
+	SearchType      string
+	SavePng         bool
+	DoSearch        bool
 }
 
 func New() *LibGenSearch {
 	nf := ""
+	nft := ""
 	f := ""
+	ft := ""
 	s := ""
+	st := ""
 	p := []string{}
 	pl := []string{}
-	st := ""
+	searchtp := ""
 	SavePng := false
 	DoSearch := true
 	return &LibGenSearch{
-		NonFiction: &nf,
-		Fiction:    &f,
-		Scientific: &s,
-		pages:      &p,
-		pageLinks:  &pl,
-		SearchType: st,
-		SavePng:    SavePng,
-		DoSearch:   DoSearch,
+		NonFiction:      &nf,
+		nonFictionTitle: &nft,
+		Fiction:         &f,
+		fictionTitle:    &ft,
+		Scientific:      &s,
+		scientificTitle: &st,
+		pages:           &p,
+		pageLinks:       &pl,
+		SearchType:      searchtp,
+		SavePng:         SavePng,
+		DoSearch:        DoSearch,
 	}
 }
 
@@ -49,18 +58,21 @@ func (search LibGenSearch) isTestRun() bool {
 // the rod seach/scrape will be different, since the layout of each search type is different on the website
 func (search LibGenSearch) nonFictionSearchString(q string) {
 	spacesArePlus := strings.ReplaceAll(q, " ", "+")
+	*search.nonFictionTitle = spacesArePlus
 	*search.NonFiction = fmt.Sprintf("/search.php?req=%s&open=0&res=100&view=simple&phrase=1&column=def", spacesArePlus)
 }
 
 // the rod seach/scrape will be different, since the layout of each search type is different on the website
 func (search LibGenSearch) fictionSearchString(q string) {
 	spacesArePlus := strings.ReplaceAll(q, " ", "+")
+	*search.fictionTitle = spacesArePlus
 	*search.Fiction = fmt.Sprintf("/fiction/?q=%s", spacesArePlus)
 }
 
 // the rod seach/scrape will be different, since the layout of each search type is different on the website
 func (search LibGenSearch) scientificSearchString(q string) {
 	spacesArePlus := strings.ReplaceAll(q, " ", "+")
+	*search.scientificTitle = spacesArePlus
 	*search.Scientific = fmt.Sprintf("/scimag/?q=%s", spacesArePlus)
 }
 
@@ -70,6 +82,11 @@ func (search LibGenSearch) fictionSearch() {
 		page := rod.New().MustConnect().MustPage("http://libgen.rs" + *search.Fiction).MustWindowFullscreen()
 		if search.isTestRun() && search.SavePng {
 			page.MustWaitLoad().MustScreenshot("Fiction.png")
+		}
+		// if we are running the software normally (not as a test)
+		if !search.isTestRun() {
+			el := page.MustElement("body > table")
+			search.saveElmentTextToLog(el.MustHTML())
 		}
 	}
 }
@@ -81,6 +98,11 @@ func (search LibGenSearch) nonFictionSearch() {
 		if search.isTestRun() && search.SavePng {
 			page.MustWaitLoad().MustScreenshot("NonFiction.png")
 		}
+		// if we are running the software normally (not as a test)
+		if !search.isTestRun() {
+			el := page.MustElement("body > table.c > tbody")
+			search.saveElmentTextToLog(el.MustHTML())
+		}
 	}
 }
 
@@ -91,6 +113,29 @@ func (search LibGenSearch) scientificSearch() {
 		if search.isTestRun() && search.SavePng {
 			page.MustWaitLoad().MustScreenshot("Scientific.png")
 		}
+		// if we are running the software normally (not as a test)
+		if !search.isTestRun() {
+			el := page.MustElement("body > table")
+			search.saveElmentTextToLog(el.MustHTML())
+		}
+	}
+}
+
+// When you search a Book, this will save the book table data as an html file
+// This is a helper function for if you are tyring to parse the html into
+// a GoLang struct
+func (search LibGenSearch) saveElmentTextToLog(str string) {
+	err := os.WriteFile(fmt.Sprintf("rod-%s-%s.html", search.SearchType, search.GetTitle()), []byte("\n"), 0644)
+	if err != nil {
+		log.Fatal(err)
+	}
+	file, err := os.OpenFile(fmt.Sprintf("rod-%s-%s.html", search.SearchType, search.GetTitle()), os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Println(err)
+	}
+	defer file.Close()
+	if _, err := file.WriteString(str); err != nil {
+		log.Fatal(err)
 	}
 }
 
@@ -124,4 +169,18 @@ func (search LibGenSearch) Search(searchType string, q string) {
 		log.Fatal("You need to specify the type of libgen search: Libgen.Search(\"[NonFiction, Fiction, or Scientific]\" string, \"Query\")")
 	}
 
+}
+
+func (search LibGenSearch) GetTitle() string {
+	switch search.SearchType {
+	case "Fiction":
+		return *search.fictionTitle
+	case "NonFiction":
+		return *search.nonFictionTitle
+	case "Scientific":
+		return *search.scientificTitle
+	default:
+		log.Fatal("The defaults for getTile are [Fiction, NonFiction, and Scientific]")
+		return ""
+	}
 }
