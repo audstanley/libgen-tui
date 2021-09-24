@@ -155,7 +155,6 @@ func (search LibGenSearch) Search(searchType string, q string) {
 		os.Exit(1)
 	}
 	*search.SearchType = searchType
-	fmt.Println("the search type is:", *search.SearchType)
 	switch *search.SearchType {
 	case "Fiction":
 		search.fictionSearchString(q)
