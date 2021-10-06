@@ -16,6 +16,7 @@ type LibGenSearch struct {
 	fictionTitle    *string
 	Scientific      *string
 	scientificTitle *string
+	Rod             *rod.Browser
 	pages           *[]string
 	pageLinks       *[]string
 	SearchType      *string
@@ -30,6 +31,11 @@ func New() *LibGenSearch {
 	ft := ""
 	s := ""
 	st := ""
+	Rod := rod.New()
+	// if runtime.GOOS == "linux" {
+	// 	var uname syscall.Utsname
+	// }
+
 	p := []string{}
 	pl := []string{}
 	SearchType := ""
@@ -42,6 +48,7 @@ func New() *LibGenSearch {
 		fictionTitle:    &ft,
 		Scientific:      &s,
 		scientificTitle: &st,
+		Rod:             Rod,
 		pages:           &p,
 		pageLinks:       &pl,
 		SearchType:      &SearchType,
@@ -67,7 +74,7 @@ func (search LibGenSearch) fictionSearchString(q string) {
 	spacesArePlus := strings.ReplaceAll(q, " ", "+")
 	*search.fictionTitle = spacesArePlus
 	*search.Fiction = fmt.Sprintf("/fiction/?q=%s", spacesArePlus)
-}
+}	
 
 // the rod seach/scrape will be different, since the layout of each search type is different on the website
 func (search LibGenSearch) scientificSearchString(q string) {

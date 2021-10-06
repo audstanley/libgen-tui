@@ -8,6 +8,7 @@ require (
 )
 
 require (
+	github.com/audstanley/NodeJs-Raspberry-Pi v0.0.0-20210928052627-08cc85a2c012 // indirect
 	github.com/davecgh/go-spew v1.1.0 // indirect
 	github.com/gdamore/encoding v1.0.0 // indirect
 	github.com/gdamore/tcell/v2 v2.4.1-0.20210905002822-f057f0a857a1 // indirect
