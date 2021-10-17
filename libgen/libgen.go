@@ -74,7 +74,7 @@ func (search LibGenSearch) fictionSearchString(q string) {
 	spacesArePlus := strings.ReplaceAll(q, " ", "+")
 	*search.fictionTitle = spacesArePlus
 	*search.Fiction = fmt.Sprintf("/fiction/?q=%s", spacesArePlus)
-}	
+}
 
 // the rod seach/scrape will be different, since the layout of each search type is different on the website
 func (search LibGenSearch) scientificSearchString(q string) {
@@ -84,9 +84,12 @@ func (search LibGenSearch) scientificSearchString(q string) {
 }
 
 // Not quite implemented
+// Not that on windows, from some reason, we are unable to write to the filesystem with either GoLang itself.fictionSearch
+// OR the go-rod library - We will have to Google this.
 func (search LibGenSearch) fictionSearch() {
 	if search.DoSearch {
-		page := rod.New().MustConnect().MustPage("http://libgen.rs" + *search.Fiction).MustWindowFullscreen()
+		page := search.Rod.MustConnect().MustPage("http://libgen.rs" + *search.Fiction).MustWindowFullscreen()
+		page.MustWaitLoad().MustScreenshot("Fiction.png")
 		if search.isTestRun() && search.SavePng {
 			page.MustWaitLoad().MustScreenshot("Fiction.png")
 		}
@@ -101,7 +104,7 @@ func (search LibGenSearch) fictionSearch() {
 // Not quite implemented
 func (search LibGenSearch) nonFictionSearch() {
 	if search.DoSearch {
-		page := rod.New().MustConnect().MustPage("http://libgen.rs" + *search.NonFiction).MustWindowFullscreen()
+		page := search.Rod.MustConnect().MustPage("http://libgen.rs" + *search.NonFiction).MustWindowFullscreen()
 		if search.isTestRun() && search.SavePng {
 			page.MustWaitLoad().MustScreenshot("NonFiction.png")
 		}
@@ -116,7 +119,7 @@ func (search LibGenSearch) nonFictionSearch() {
 // Not quite implemented
 func (search LibGenSearch) scientificSearch() {
 	if search.DoSearch {
-		page := rod.New().MustConnect().MustPage("http://libgen.rs" + *search.Scientific).MustWindowFullscreen()
+		page := search.Rod.MustConnect().MustPage("http://libgen.rs" + *search.Scientific).MustWindowFullscreen()
 		if search.isTestRun() && search.SavePng {
 			page.MustWaitLoad().MustScreenshot("Scientific.png")
 		}

@@ -3,7 +3,7 @@ module github.com/audstanley/libgen-tui
 go 1.17
 
 require (
-	github.com/go-rod/rod v0.101.7
+	github.com/go-rod/rod v0.101.8
 	github.com/rivo/tview v0.0.0-20210909154944-f7430b878d17
 )
 
