@@ -19,4 +19,5 @@
 tests/*.png
 # ignore the go-rod html examples for parsing
 *.html
+*.json
 rod-logs/
