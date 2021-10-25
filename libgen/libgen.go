@@ -6,7 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"os"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -25,12 +28,17 @@ type Book struct {
 }
 
 type WebPageOfBooks struct {
-	Books []Book `json:"books"`
+	Books                   []Book `json:"books"`
+	CurrentPageNumber       uint64 `json:"currentPageNumber"`
+	NumberOfResults         uint64 `json:"NumberOfResults"`
+	NumberOfResultsAsString string `json:"NumberOfResultsAsString"`
+	TopPageNumber           uint64 `json:"topPageNumber"`
 }
 
 type LibGenSearch struct {
 	NonFiction      *string
 	nonFictionTitle *string
+	PobFiction      *WebPageOfBooks
 	Fiction         *string
 	fictionTitle    *string
 	Scientific      *string
@@ -46,6 +54,7 @@ type LibGenSearch struct {
 func New() *LibGenSearch {
 	nf := ""
 	nft := ""
+	pobf := WebPageOfBooks{}
 	f := ""
 	ft := ""
 	s := ""
@@ -63,6 +72,7 @@ func New() *LibGenSearch {
 	return &LibGenSearch{
 		NonFiction:      &nf,
 		nonFictionTitle: &nft,
+		PobFiction:      &pobf,
 		Fiction:         &f,
 		fictionTitle:    &ft,
 		Scientific:      &s,
@@ -106,6 +116,7 @@ func (search LibGenSearch) scientificSearchString(q string) {
 // Not that on windows, from some reason, we are unable to write to the filesystem with either GoLang itself.fictionSearch
 // OR the go-rod library - We will have to Google this.
 func (search LibGenSearch) fictionSearch() {
+	// When a fiction seach is made - it always returns 25 results, and there is not way to change that.
 	if search.DoSearch {
 		page := search.Rod.MustConnect().MustPage("http://libgen.rs" + *search.Fiction).MustWindowFullscreen()
 		page.MustWaitLoad().MustScreenshot("Fiction.png")
@@ -116,8 +127,8 @@ func (search LibGenSearch) fictionSearch() {
 		if !search.isTestRun() {
 			err := rod.Try(func() {
 				tbody := page.Timeout(6 * time.Second).MustSearch("tbody")
+				//pob := WebPageOfBooks{}
 				if tbody != nil {
-					pob := WebPageOfBooks{}
 					trs := tbody.MustElements("tr")
 					for _, tr := range trs {
 						tds := tr.MustElements("td")
@@ -142,26 +153,59 @@ func (search LibGenSearch) fictionSearch() {
 								book.Mirror1 = fmt.Sprint(link.MustProperty("href"))
 							}
 						}
-						pob.Books = append(pob.Books, book)
-						// as := tr.MustElementsX("//a")
-
-						// for i, a := range as {
-						// 	pob.Books[i].Mirror1 = fmt.Sprintln(a.MustHTML())
-						// }
-
+						search.PobFiction.Books = append(search.PobFiction.Books, book)
 					}
-					search.SaveWebPageOfBooks(pob)
 				}
+				// we need to search for div class: catalog_paginator
+				// body > div:nth-child(7) > div:nth-child(1)
+
+				// (?P<Results>\d*\W*\d*\W*\d*\W*\d*)  - regex for just under a trillion results.
+				// there was some unicode characters therefore \s doesn't work in regex
+				// 3 955 files found
+				numberOfResultsHtml := page.MustSearch("body > div:nth-child(7) > div:nth-child(1)")
+				if numberOfResultsHtml != nil {
+					text := numberOfResultsHtml.MustText()
+					reg := regexp.MustCompile(`(?P<Results>\d*\W*\d*\W*\d*\W*\d*)`)
+					matched := reg.MatchString(text)
+					if matched {
+						//names := reg.SubexpNames()
+						results := reg.FindStringSubmatch(text)[1]
+						// any character that is not 0-9, get rid of. [ie unicode stuff]
+						reg2 := regexp.MustCompile("[^0-9]+")
+						processedString := reg2.ReplaceAllString(results, "")
+						// now we can parse to a digit [finally!]
+						search.PobFiction.NumberOfResultsAsString = processedString
+						topNumberOfResults, err := strconv.Atoi(processedString)
+						search.PobFiction.NumberOfResults = uint64(topNumberOfResults)
+						topNumberOfResultsAsFloat := float64(topNumberOfResults)
+						if err != nil {
+							log.Fatal(err)
+						}
+						search.PobFiction.TopPageNumber = uint64(math.Ceil(topNumberOfResultsAsFloat / 25))
+						if search.PobFiction.TopPageNumber == 0 {
+							// if no search results, we still have a top page number of 1.
+							search.PobFiction.TopPageNumber = 1
+						}
+						if search.PobFiction.CurrentPageNumber == 0 {
+							search.PobFiction.CurrentPageNumber = 1
+						}
+
+					} else {
+						search.PobFiction.NumberOfResultsAsString = "shoot:" + numberOfResultsHtml.MustHTML()
+					}
+
+				} else {
+					search.PobFiction.NumberOfResultsAsString = "nope"
+				}
+				search.SaveWebPageOfBooks(*search.PobFiction)
 
 			})
 			if errors.Is(err, context.DeadlineExceeded) {
+				// this should me a modal - or something.
 				fmt.Println("Could not find that book in a reasonable amount of time")
 			} else if err != nil {
-				panic(err)
+				log.Fatal(err)
 			}
-			//el := page.MustElement("body > table")
-			//search.saveElmentTextToLog(el.MustHTML())
-
 		}
 	}
 }
