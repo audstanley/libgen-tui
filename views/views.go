@@ -17,6 +17,8 @@ func newState() *state {
 	}
 }
 
+// Gui Struct is basically the top level controller
+// for the libgen-tui application
 type Gui struct {
 	App          *tview.Application
 	Pages        *tview.Pages
@@ -26,6 +28,7 @@ type Gui struct {
 	LibgenSearch *libgen.LibGenSearch
 }
 
+// New function is a constructor for the Gui struct
 func New() *Gui {
 	libgenConstructor := libgen.New()
 	return &Gui{
@@ -38,6 +41,7 @@ func New() *Gui {
 
 var info = tview.NewList().AddItem("List item 1", "Some explanatory text", 'a', nil)
 
+// LibGenFlexCreator created a tview flex for after a search is done.
 func LibGenFlexCreator(g *Gui) {
 	// a lot of this code can go -
 	// I'm not sure how to get a table into a flex, and we have pages that we

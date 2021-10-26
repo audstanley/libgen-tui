@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-rod/rod"
@@ -23,6 +24,7 @@ type Book struct {
 	Language          string `json:"language"`
 	FormatAndSize     string `json:"formatAndSize"`
 	Mirror1           string `json:"mirror1"`
+	DownloadLink      string `json:"downloadLink"`
 	LinkToDescription string `json:"linkToDescription"`
 	Description       string `json:"description"`
 }
@@ -91,21 +93,21 @@ func (search LibGenSearch) isTestRun() bool {
 	return strings.HasSuffix(os.Args[0], ".test")
 }
 
-// the rod seach/scrape will be different, since the layout of each search type is different on the website
+// the rod search/scrape will be different, since the layout of each search type is different on the website
 func (search LibGenSearch) nonFictionSearchString(q string) {
 	spacesArePlus := strings.ReplaceAll(q, " ", "+")
 	*search.nonFictionTitle = spacesArePlus
 	*search.NonFiction = fmt.Sprintf("/search.php?req=%s&open=0&res=100&view=simple&phrase=1&column=def", spacesArePlus)
 }
 
-// the rod seach/scrape will be different, since the layout of each search type is different on the website
+// the rod search/scrape will be different, since the layout of each search type is different on the website
 func (search LibGenSearch) fictionSearchString(q string) {
 	spacesArePlus := strings.ReplaceAll(q, " ", "+")
 	*search.fictionTitle = spacesArePlus
 	*search.Fiction = fmt.Sprintf("/fiction/?q=%s", spacesArePlus)
 }
 
-// the rod seach/scrape will be different, since the layout of each search type is different on the website
+// the rod search/scrape will be different, since the layout of each search type is different on the website
 func (search LibGenSearch) scientificSearchString(q string) {
 	spacesArePlus := strings.ReplaceAll(q, " ", "+")
 	*search.scientificTitle = spacesArePlus
@@ -197,6 +199,9 @@ func (search LibGenSearch) fictionSearch() {
 				} else {
 					search.PobFiction.NumberOfResultsAsString = "nope"
 				}
+
+				// Here we can go to each mirror link, and try to get the description of the Book data.
+				search.getBookDescription()
 				search.SaveWebPageOfBooks(*search.PobFiction)
 
 			})
@@ -240,6 +245,8 @@ func (search LibGenSearch) scientificSearch() {
 	}
 }
 
+// saveElmentTextToLog is a private module that is used for testing by saving some
+// of the search data to an html file.
 // When you search a Book, this will save the book table data as an html file
 // This is a helper function for if you are tyring to parse the html into
 // a GoLang struct
@@ -258,14 +265,28 @@ func (search LibGenSearch) saveElmentTextToLog(str string) {
 	}
 }
 
+func (search LibGenSearch) saveDwonloadLinkToLog(str string) {
+	file, err := os.OpenFile(fmt.Sprintf("rod-%s-%s.log", *search.SearchType, search.GetTitle()), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Println(err)
+	}
+	defer file.Close()
+	if _, err := file.WriteString(str + "\n"); err != nil {
+		log.Fatal(err)
+	}
+}
+
+// GetPages should return a list of pages - not fully implemented just yet
 func (search LibGenSearch) GetPages() *[]string {
 	return search.pages
 }
 
+// GetPageLinks should return a list of page links - not fully implemented just yet
 func (search LibGenSearch) GetPageLinks() *[]string {
 	return search.pageLinks
 }
 
+// The Search module makes a libgen search
 // searchType: "Fiction", "NonFiction", "Scientific"
 // The second argument is the query
 func (search LibGenSearch) Search(searchType string, q string) {
@@ -290,6 +311,7 @@ func (search LibGenSearch) Search(searchType string, q string) {
 
 }
 
+// GetTitle returns the title of the book based on what the search types is.
 func (search LibGenSearch) GetTitle() string {
 	switch *search.SearchType {
 	case "Fiction":
@@ -304,6 +326,8 @@ func (search LibGenSearch) GetTitle() string {
 	}
 }
 
+// SaveWebPageOfBooks will save a json file of the parsed/scraped data
+// and save it to a json file.
 func (search LibGenSearch) SaveWebPageOfBooks(pob WebPageOfBooks) {
 	for _, b := range pob.Books {
 		// trim up author new line before saving to file:
@@ -327,5 +351,52 @@ func (search LibGenSearch) SaveWebPageOfBooks(pob WebPageOfBooks) {
 	if _, err := file.WriteString(string(jObj)); err != nil {
 		log.Fatal(err)
 	}
+
+}
+
+// getBookDescription switches between search types and will
+// call other more specific private modules
+func (search LibGenSearch) getBookDescription() {
+	switch *search.SearchType {
+	case "Fiction":
+		search.getBookDescriptionForFiction()
+	case "NonFiction":
+		search.getBookDescriptionForFiction()
+	case "Scientific":
+		search.getBookDescriptionForFiction()
+	}
+}
+
+// getBookDescriptionForNonFiction tries to get descriptions for nonfiction books
+func (search LibGenSearch) getBookDescriptionForNonFiction() {
+
+}
+
+// getBookDescriptionForFiction tries to get descriptions for fiction books
+// right now the code doesn't get descriptions just yet, just the DownloadLink for the Book
+// but I'll implement that soon. - I need to look into making sure that if the page doesn't have the
+// div element that go-rod doesn't wait indenfinately for it to show up [with the MustElement function]
+// we DO NOT want the program to hang - some links don't HAVE descriptions.
+func (search LibGenSearch) getBookDescriptionForFiction() {
+
+	var wg sync.WaitGroup
+	wg.Add(len(search.PobFiction.Books))
+	for i, book := range search.PobFiction.Books {
+		go func(differentI int, theBook Book) {
+			defer wg.Done()
+			time.Sleep((time.Duration(differentI) * 75) * time.Millisecond)
+			page := rod.New().MustConnect().MustPage()
+			page.MustNavigate(theBook.Mirror1)
+			// #download > h2 > a
+			download := page.MustElement("#download > h2 > a")
+			search.PobFiction.Books[differentI].DownloadLink = fmt.Sprint(download.MustProperty("href"))
+			search.saveDwonloadLinkToLog(search.PobFiction.Books[differentI].Title + " " + search.PobFiction.Books[differentI].DownloadLink)
+		}(i, book)
+	}
+	wg.Wait()
+}
+
+// getBookDescriptionForScientific tries to get descriptions for scientific articles
+func (search LibGenSearch) getBookDescriptionForScientific() {
 
 }
