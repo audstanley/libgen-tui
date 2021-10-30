@@ -38,19 +38,20 @@ type WebPageOfBooks struct {
 }
 
 type LibGenSearch struct {
-	NonFiction      *string
-	nonFictionTitle *string
-	PobFiction      *WebPageOfBooks
-	Fiction         *string
-	fictionTitle    *string
-	Scientific      *string
-	scientificTitle *string
-	Rod             *rod.Browser
-	pages           *[]string
-	pageLinks       *[]string
-	SearchType      *string
-	SavePng         bool
-	DoSearch        bool
+	NonFiction         *string
+	nonFictionTitle    *string
+	PobFiction         *WebPageOfBooks
+	Fiction            *string
+	fictionTitle       *string
+	Scientific         *string
+	scientificTitle    *string
+	Rod                *rod.Browser
+	pages              *[]string
+	pageLinks          *[]string
+	SearchType         *string
+	SavePng            bool
+	DoSearch           bool
+	PageOfBooksChannel chan WebPageOfBooks
 }
 
 func New() *LibGenSearch {
@@ -62,6 +63,7 @@ func New() *LibGenSearch {
 	s := ""
 	st := ""
 	Rod := rod.New()
+	pobChannel := make(chan WebPageOfBooks)
 	// if runtime.GOOS == "linux" {
 	// 	var uname syscall.Utsname
 	// }
@@ -72,19 +74,20 @@ func New() *LibGenSearch {
 	SavePng := false
 	DoSearch := true
 	return &LibGenSearch{
-		NonFiction:      &nf,
-		nonFictionTitle: &nft,
-		PobFiction:      &pobf,
-		Fiction:         &f,
-		fictionTitle:    &ft,
-		Scientific:      &s,
-		scientificTitle: &st,
-		Rod:             Rod,
-		pages:           &p,
-		pageLinks:       &pl,
-		SearchType:      &SearchType,
-		SavePng:         SavePng,
-		DoSearch:        DoSearch,
+		NonFiction:         &nf,
+		nonFictionTitle:    &nft,
+		PobFiction:         &pobf,
+		Fiction:            &f,
+		fictionTitle:       &ft,
+		Scientific:         &s,
+		scientificTitle:    &st,
+		Rod:                Rod,
+		pages:              &p,
+		pageLinks:          &pl,
+		SearchType:         &SearchType,
+		SavePng:            SavePng,
+		DoSearch:           DoSearch,
+		PageOfBooksChannel: pobChannel,
 	}
 }
 
@@ -118,7 +121,7 @@ func (search LibGenSearch) scientificSearchString(q string) {
 // Not that on windows, from some reason, we are unable to write to the filesystem with either GoLang itself.fictionSearch
 // OR the go-rod library - We will have to Google this.
 func (search LibGenSearch) fictionSearch() {
-	// When a fiction seach is made - it always returns 25 results, and there is not way to change that.
+	// When a fiction search is made - it always returns 25 results, and there is not way to change that.
 	if search.DoSearch {
 		page := search.Rod.MustConnect().MustPage("http://libgen.rs" + *search.Fiction).MustWindowFullscreen()
 		page.MustWaitLoad().MustScreenshot("Fiction.png")
@@ -373,27 +376,63 @@ func (search LibGenSearch) getBookDescriptionForNonFiction() {
 }
 
 // getBookDescriptionForFiction tries to get descriptions for fiction books
-// right now the code doesn't get descriptions just yet, just the DownloadLink for the Book
-// but I'll implement that soon. - I need to look into making sure that if the page doesn't have the
-// div element that go-rod doesn't wait indenfinately for it to show up [with the MustElement function]
-// we DO NOT want the program to hang - some links don't HAVE descriptions.
+// it also gets the mirror-1 link - for downloading
 func (search LibGenSearch) getBookDescriptionForFiction() {
-
 	var wg sync.WaitGroup
 	wg.Add(len(search.PobFiction.Books))
 	for i, book := range search.PobFiction.Books {
 		go func(differentI int, theBook Book) {
 			defer wg.Done()
-			time.Sleep((time.Duration(differentI) * 75) * time.Millisecond)
+			time.Sleep((time.Duration(differentI) * 250) * time.Millisecond)
 			page := rod.New().MustConnect().MustPage()
-			page.MustNavigate(theBook.Mirror1)
-			// #download > h2 > a
-			download := page.MustElement("#download > h2 > a")
-			search.PobFiction.Books[differentI].DownloadLink = fmt.Sprint(download.MustProperty("href"))
-			search.saveDwonloadLinkToLog(search.PobFiction.Books[differentI].Title + " " + search.PobFiction.Books[differentI].DownloadLink)
+			err := rod.Try(func() {
+				page.Timeout(5 * time.Second).MustNavigate(theBook.Mirror1)
+
+				// #download > h2 > a
+				download := page.MustElement("#download > h2 > a")
+				search.PobFiction.Books[differentI].DownloadLink = fmt.Sprint(download.MustProperty("href"))
+				search.saveDwonloadLinkToLog(search.PobFiction.Books[differentI].Title + " " + search.PobFiction.Books[differentI].DownloadLink)
+
+				descriptionTbody := page.Timeout(4 * time.Second).MustSearch("tbody")
+				if descriptionTbody != nil {
+					trs := descriptionTbody.MustElements("tr")
+					for _, tr := range trs {
+						tds := tr.MustElements("td")
+						for _, td := range tds {
+							descriptionIndicator := td.MustText()
+							splitData := strings.Split(descriptionIndicator, "\n")
+							descFound := false
+							for _, data := range splitData {
+								if data == "Description:" {
+									descFound = true
+								} else if descFound {
+									search.PobFiction.Books[differentI].Description = data
+									descFound = false
+								}
+							}
+						}
+					}
+				}
+				search.saveDwonloadLinkToLog(search.PobFiction.Books[differentI].Title + " " + search.PobFiction.Books[differentI].DownloadLink + " : DONE")
+			})
+
+			if errors.Is(err, context.DeadlineExceeded) {
+				// if rod times out - we'll just crash the app, for now.
+				search.PobFiction.Books[differentI].Description = fmt.Sprintf("outerDescriptionError: %s", err.Error())
+			} else if err != nil {
+				// other errors - we'll just crash the app, for now.
+				log.Fatal(err)
+			}
+
+			// Send the books to the Page Of Books Channel.
+			// This can allow the view to listen to a channel and update the view dynamically as
+			// new books come in from the search.
+			search.PageOfBooksChannel <- *search.PobFiction
+
 		}(i, book)
 	}
 	wg.Wait()
+
 }
 
 // getBookDescriptionForScientific tries to get descriptions for scientific articles
