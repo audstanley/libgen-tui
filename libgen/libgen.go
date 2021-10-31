@@ -378,6 +378,7 @@ func (search LibGenSearch) getBookDescriptionForNonFiction() {
 // getBookDescriptionForFiction tries to get descriptions for fiction books
 // it also gets the mirror-1 link - for downloading
 func (search LibGenSearch) getBookDescriptionForFiction() {
+	search.PageOfBooksChannel = make(chan WebPageOfBooks)
 	var wg sync.WaitGroup
 	wg.Add(len(search.PobFiction.Books))
 	for i, book := range search.PobFiction.Books {
@@ -432,7 +433,7 @@ func (search LibGenSearch) getBookDescriptionForFiction() {
 		}(i, book)
 	}
 	wg.Wait()
-
+	close(search.PageOfBooksChannel)
 }
 
 // getBookDescriptionForScientific tries to get descriptions for scientific articles
