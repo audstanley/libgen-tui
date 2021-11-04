@@ -18,7 +18,7 @@ func TestBookNonFiction(t *testing.T) {
 	query := "Mastering Golang"
 	search.Search("NonFiction", query)
 	t.Log("\tSEARCH_TYPE", *search.SearchType)
-	assert.Exactly(t, *search.NonFiction, nonFictionPre+search.GetTitle()+nonFictionPost)
+	assert.Exactly(t, *search.NonFiction, nonFictionPre+search.GetTitle()+nonFictionPost+"&page=1")
 }
 
 func TestBookFiction(t *testing.T) {
@@ -27,7 +27,7 @@ func TestBookFiction(t *testing.T) {
 	query := "Game of Thrones"
 	search.Search("Fiction", query)
 	t.Log("\tSEARCH_TYPE", *search.SearchType)
-	assert.Exactly(t, *search.Fiction, fictionPre+search.GetTitle())
+	assert.Exactly(t, *search.Fiction, fictionPre+search.GetTitle()+"&page=1")
 }
 
 func TestArticleScientific(t *testing.T) {
@@ -37,5 +37,5 @@ func TestArticleScientific(t *testing.T) {
 	search.Search("Scientific", query)
 	t.Log("\tSEARCH_TYPE", *search.SearchType)
 	var expected string = scientificPre + search.GetTitle()
-	assert.Exactly(t, *search.Scientific, expected)
+	assert.Exactly(t, *search.Scientific, expected+"&page=1")
 }
