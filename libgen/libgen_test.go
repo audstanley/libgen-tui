@@ -8,7 +8,7 @@ import (
 )
 
 var nonFictionPre string = `/search.php?req=`
-var nonFictionPost string = `&open=0&res=100&view=simple&phrase=1&column=def`
+var nonFictionPost string = `&open=0&res=25&view=simple&phrase=1&column=def`
 var fictionPre string = `/fiction/?q=`
 var scientificPre string = `/scimag/?q=`
 
