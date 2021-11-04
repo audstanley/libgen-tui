@@ -1,21 +1,13 @@
 package views
 
 import (
+	"strconv"
+
 	"github.com/audstanley/libgen-tui/libgen"
 	"github.com/gdamore/tcell/v2"
 
 	"github.com/rivo/tview"
 )
-
-type state struct {
-	stopChans map[string]chan int
-}
-
-func newState() *state {
-	return &state{
-		stopChans: make(map[string]chan int),
-	}
-}
 
 // Gui Struct is basically the top level controller
 // for the libgen-tui application
@@ -23,78 +15,147 @@ type Gui struct {
 	App          *tview.Application
 	Pages        *tview.Pages
 	Flex         *tview.Flex
+	Table        *tview.Table
 	Form         *tview.Form
-	State        *state
 	LibgenSearch *libgen.LibGenSearch
 }
 
 // New function is a constructor for the Gui struct
 func New() *Gui {
-	libgenConstructor := libgen.New()
+	app := *tview.NewApplication()
+	pages := *tview.NewPages()
+	flex := *tview.NewFlex()
+	table := *tview.NewTable()
+	form := *tview.NewForm()
+	libgenConstructor := *libgen.New()
 	return &Gui{
-		App:          tview.NewApplication(),
-		Pages:        tview.NewPages(),
-		State:        newState(),
-		LibgenSearch: libgenConstructor,
+		App:          &app,
+		Pages:        &pages,
+		Flex:         &flex,
+		Table:        &table,
+		Form:         &form,
+		LibgenSearch: &libgenConstructor,
 	}
 }
 
-var info = tview.NewList().AddItem("List item 1", "Some explanatory text", 'a', nil)
-
-// LibGenFlexCreator created a tview flex for after a search is done.
-func LibGenFlexCreator(g *Gui) {
-	// a lot of this code can go -
-	// I'm not sure how to get a table into a flex, and we have pages that we
-	// need to likely lean also.
-	// I'm just trying to get some code in here so that we can get going.
-	// the search data should now be accessable in the gui struct.
-	// the fiction search data "an array of books" is in
-	// g.LibgenSearch.PobFiction.Books [this will be an array of books] based on the first page of results.
-
-	modalShown := true
-	pages := tview.NewPages()
-
-	g.Flex = tview.NewFlex().
-		AddItem(tview.NewBox().SetBorder(true).SetTitle("LibGen Search Results").SetTitleAlign(tview.AlignLeft), 0, 1, false).
-		AddItem(tview.NewFlex().
-			SetDirection(tview.FlexRow).
-			AddItem(tview.NewBox().SetBorder(true).SetTitle("Middle"), 0, 1, false), 0, 2, false).
-		AddItem(info, 0, 1, true).
-		AddItem(tview.NewBox().SetBorder(true).SetTitle("Action"), 20, 3, false)
-
-	g.Flex.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		if modalShown {
-			//nextSlide()
-			modalShown = false
+// TableCreatorAfterSearch will generate a table after an initial search is made.
+// When the left or right arrow keys are pressed, new page searches are loaded up.
+func (g Gui) TableCreatorAfterSearch() {
+	g.Table = tview.NewTable().
+		SetFixed(1, 1).
+		SetSelectable(true, false)
+	// create the table from the search
+	layout := []string{"", "Author", "Title", "Publisher", "Language", "Year", "Pages", "Format / Size"}
+	for i, book := range g.LibgenSearch.GetWebPageOfBooksStruct().Books {
+		layout = append(layout, strconv.Itoa(i+1+(25*(int(g.LibgenSearch.GetWebPageOfBooksStruct().CurrentPageNumber)-1))))
+		if len(book.Author) > 31 {
+			layout = append(layout, book.Author[0:31]+"...")
 		} else {
-			pages.ShowPage("modal")
-			modalShown = true
+			layout = append(layout, book.Author)
+		}
+		if len(book.Title) > 47 {
+			layout = append(layout, book.Title[0:47]+"...")
+		} else {
+			layout = append(layout, book.Title)
+		}
+		if len(book.Publisher) > 31 {
+			layout = append(layout, book.Publisher[0:31]+"...")
+		} else {
+			layout = append(layout, book.Publisher)
+		}
+		layout = append(layout, book.Language)
+		layout = append(layout, book.Year)
+		layout = append(layout, book.Pages)
+		layout = append(layout, book.FormatAndSize)
+	}
+	cols, rows := 8, len(g.LibgenSearch.GetWebPageOfBooksStruct().Books)+1
+	word := 0
+	for r := 0; r < rows; r++ {
+		for c := 0; c < cols; c++ {
+			color := tcell.ColorWhite
+			if c < 1 || r < 1 {
+				color = tcell.ColorYellow
+			}
+			g.Table.SetCell(r, c,
+				tview.NewTableCell(layout[word]).
+					SetTextColor(color).
+					SetAlign(tview.AlignLeft))
+			word = (word + 1) % len(layout)
+		}
+	}
+	g.Table.Select(0, 0).SetFixed(1, 1).SetDoneFunc(func(key tcell.Key) {
+		if key == tcell.KeyEscape {
+			g.App.SetRoot(g.Pages, true).EnableMouse(true).Sync().SetFocus(g.Pages)
+		}
+		if key == tcell.KeyEnter {
+			g.Table.SetSelectable(true, true)
+		}
+	}).SetSelectedFunc(func(row int, column int) {
+		g.Table.GetCell(row, column).SetTextColor(tcell.ColorRed)
+		g.Table.SetSelectable(true, false)
+	}).SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+
+		switch event.Key() {
+		// Listen for Right Arrow Key
+		case tcell.KeyRight:
+			// next page search
+			g.LibgenSearch.NextPageUpdate()
+			g.LibgenSearch.ClearAllDataForNextPageSearch()
+			channelLength := g.LibgenSearch.Search(*g.LibgenSearch.SearchType, g.LibgenSearch.GetTitle())
+			channelOfBooks := make(chan libgen.WebPageOfBooks, channelLength)
+			g.LibgenSearch.SaveDownloadLinkToLog(strconv.Itoa(channelLength))
+			g.LibgenSearch.GetBookDescription(channelOfBooks)
+
+			for i := 0; i < channelLength; i++ {
+				<-channelOfBooks
+				g.TableCreatorAfterSearch()
+				g.App.SetRoot(g.Table, true).Sync().SetFocus(g.Table)
+			}
+			g.LibgenSearch.SaveWebPageOfBooks()
+		// Listen for Left Arrow Key
+		case tcell.KeyLeft:
+			// previous page search
+			g.LibgenSearch.PreviousPageUpdate()
+			g.LibgenSearch.ClearAllDataForNextPageSearch()
+			channelLength := g.LibgenSearch.Search(*g.LibgenSearch.SearchType, g.LibgenSearch.GetTitle())
+			channelOfBooks := make(chan libgen.WebPageOfBooks, channelLength)
+			g.LibgenSearch.SaveDownloadLinkToLog(strconv.Itoa(channelLength))
+			g.LibgenSearch.GetBookDescription(channelOfBooks)
+
+			for i := 0; i < channelLength; i++ {
+				<-channelOfBooks
+				g.TableCreatorAfterSearch()
+				g.App.SetRoot(g.Table, true).Sync().SetFocus(g.Table)
+			}
+			g.LibgenSearch.SaveWebPageOfBooks()
 		}
 		return event
 	})
-	modal := tview.NewModal().
-		SetText("Resize the window to see the effect of the flexbox parameters").
-		AddButtons([]string{"Ok"}).SetDoneFunc(func(buttonIndex int, buttonLabel string) {
-		pages.HidePage("modal")
-	})
-	pages.AddPage("flex", g.Flex, true, true).
-		AddPage("modal", modal, false, false)
-
+	if err := g.App.SetRoot(g.Table, true).EnableMouse(true).Run(); err != nil {
+		panic(err)
+	}
 }
 
-func LibGenSearchFromCreator(g *Gui) {
-	g.Form = tview.NewForm().
+func (g Gui) LibGenSearchFormCreator() {
+	g.Form.
 		AddDropDown("Title", []string{"NonFiction", "Fiction", "Scientific"}, 0, nil).
 		AddInputField("Search", "", 20, nil, nil).
 		AddButton("Search", func() {
-			//fmt.Println("Hello World")
-			//g.App.SetRoot(, true).Sync().SetFocus(g.)
-			//g.State
+			g.LibgenSearch = libgen.New()
 			_, searchType := g.Form.GetFormItem(0).(*tview.DropDown).GetCurrentOption()
 			query := g.Form.GetFormItem(1).(*tview.InputField).GetText()
-			g.LibgenSearch.Search(searchType, query)
-			// fmt.Printf("Form Item: %s", g.Form.GetFormItem(1).(*tview.InputField).GetText())
-			g.App.SetRoot(g.Flex, true).Sync().SetFocus(g.Flex)
+			channelLength := g.LibgenSearch.Search(searchType, query)
+			// Create a buffered channel for the Page of books
+			channelOfBooks := make(chan libgen.WebPageOfBooks, channelLength)
+			g.LibgenSearch.SaveDownloadLinkToLog(strconv.Itoa(channelLength))
+			go g.LibgenSearch.GetBookDescription(channelOfBooks)
+
+			for i := 0; i < channelLength; i++ {
+				<-channelOfBooks
+				g.TableCreatorAfterSearch()
+				g.App.SetRoot(g.Table, true).Sync().SetFocus(g.Table)
+			}
+			g.LibgenSearch.SaveWebPageOfBooks()
 		}).
 		AddButton("Quit", func() {
 			g.App.Stop()
