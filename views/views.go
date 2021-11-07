@@ -5,6 +5,7 @@ import (
 
 	"github.com/audstanley/libgen-tui/libgen"
 	"github.com/gdamore/tcell/v2"
+	"github.com/pkg/browser"
 
 	"github.com/rivo/tview"
 )
@@ -93,6 +94,25 @@ func (g Gui) TableCreatorAfterSearch() {
 	}).SetSelectedFunc(func(row int, column int) {
 		g.Table.GetCell(row, column).SetTextColor(tcell.ColorRed)
 		g.Table.SetSelectable(true, false)
+
+		modal := tview.NewModal().
+			SetText("Do you to download the selected book? (TODO: say book title)?").
+			AddButtons([]string{"Cancel", "Download"}).
+			SetDoneFunc(func(buttonIndex int, buttonLabel string) {
+				//if not then close the modal
+				if buttonLabel == "Cancel" {
+					g.App.SetRoot(g.Table, true).Sync().SetFocus(g.Table)
+				}
+				//if yes then download the book
+				if buttonLabel == "Download" {
+					browser.OpenURL("http://www.fullerton.edu/")
+
+				}
+			})
+		if err := g.App.SetRoot(modal, false).SetFocus(modal).Run(); err != nil {
+			panic(err)
+		}
+
 	}).SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 
 		switch event.Key() {
