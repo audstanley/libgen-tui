@@ -1,6 +1,7 @@
 package views
 
 import (
+	"os"
 	"strconv"
 
 	"github.com/audstanley/libgen-tui/libgen"
@@ -183,5 +184,6 @@ func (g Gui) LibGenSearchFormCreator() {
 		}).
 		AddButton("Quit", func() {
 			g.App.Stop()
+			os.Exit(1)
 		})
 }
