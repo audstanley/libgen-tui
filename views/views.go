@@ -99,8 +99,9 @@ func (g Gui) TableCreatorAfterSearch() {
 		//get link
 		downloadLink := g.LibgenSearch.GetWebPageOfBooksStruct().Books[row].DownloadLink
 		bookName := g.LibgenSearch.GetWebPageOfBooksStruct().Books[row].Title
+		description := g.LibgenSearch.GetWebPageOfBooksStruct().Books[row].Description
 		modal := tview.NewModal().
-			SetText("Do you want to download " + bookName + "?\n" + downloadLink).
+			SetText("Do you want to download \"" + bookName + "\"?\n\n" + description).
 			AddButtons([]string{"Cancel", "Download"}).
 			SetDoneFunc(func(buttonIndex int, buttonLabel string) {
 
