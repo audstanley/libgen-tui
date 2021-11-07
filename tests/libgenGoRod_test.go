@@ -47,7 +47,11 @@ func TestSearchForMasteringGoLangBook(t *testing.T) {
 	search.Search("NonFiction", "Mastering Golang")
 	md5, _ := md5HashOfPng("NonFiction", t)
 	t.Log("md5 length", len(md5))
-	assert.Contains(t, []string{"9fe7fd0e31a39af5315dfdbda1503e15"}, md5, "the checksum should be cached")
+	assert.Contains(t, []string{
+		"9fe7fd0e31a39af5315dfdbda1503e15",
+		"7334a2dabdc4f656a5d919b51edcc50a"},
+		md5,
+		"the checksum should be cached")
 	cleanUpPngFiles("NonFiction")
 }
 
@@ -61,6 +65,11 @@ func TestSearchForMasteringRegularExpressionsBook(t *testing.T) {
 	search.Search("NonFiction", "Mastering Regular Expressions")
 	md5, _ := md5HashOfPng("NonFiction", t)
 	t.Log("md5 length", len(md5))
-	assert.Contains(t, []string{"8c06b90cc3edbd8cb46e8d079fba3a66", "675bf95b6d2f59dcc11dda5e0df8f497"}, md5, "the checksum should be cached")
+	assert.Contains(t, []string{
+		"8c06b90cc3edbd8cb46e8d079fba3a66",
+		"675bf95b6d2f59dcc11dda5e0df8f497",
+		"d9d14eda6eebceb6dfb2d983fc5b8b21"},
+		md5,
+		"the checksum should be cached")
 	cleanUpPngFiles("NonFiction")
 }
