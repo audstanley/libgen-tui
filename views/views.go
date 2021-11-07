@@ -95,17 +95,21 @@ func (g Gui) TableCreatorAfterSearch() {
 		g.Table.GetCell(row, column).SetTextColor(tcell.ColorRed)
 		g.Table.SetSelectable(true, false)
 
+		//get link
+		downloadLink := g.LibgenSearch.GetWebPageOfBooksStruct().Books[row].DownloadLink
+		bookName := g.LibgenSearch.GetWebPageOfBooksStruct().Books[row].Title
 		modal := tview.NewModal().
-			SetText("Do you to download the selected book? (TODO: say book title)?").
+			SetText("Do you to download " + bookName + "?\n" + downloadLink).
 			AddButtons([]string{"Cancel", "Download"}).
 			SetDoneFunc(func(buttonIndex int, buttonLabel string) {
+
 				//if not then close the modal
 				if buttonLabel == "Cancel" {
 					g.App.SetRoot(g.Table, true).Sync().SetFocus(g.Table)
 				}
 				//if yes then download the book
 				if buttonLabel == "Download" {
-					browser.OpenURL("http://www.fullerton.edu/")
+					browser.OpenURL(downloadLink)
 
 				}
 			})
