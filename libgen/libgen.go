@@ -233,7 +233,7 @@ func (search LibGenSearch) nonFictionSearch() int {
 		// if we are running the software normally (not as a test)
 		if !search.isTestRun() {
 			err := rod.Try(func() {
-				tbody := page.Timeout(60 * time.Second).MustSearch("body > table.c > tbody")
+				tbody := page.Timeout(180 * time.Second).MustSearch("body > table.c > tbody")
 				if tbody != nil {
 					trs := tbody.MustElements("tr")
 					for i, tr := range trs {
