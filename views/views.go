@@ -1,10 +1,12 @@
 package views
 
 import (
+	"os"
 	"strconv"
 
 	"github.com/audstanley/libgen-tui/libgen"
 	"github.com/gdamore/tcell/v2"
+	"github.com/pkg/browser"
 
 	"github.com/rivo/tview"
 )
@@ -93,6 +95,30 @@ func (g Gui) TableCreatorAfterSearch() {
 	}).SetSelectedFunc(func(row int, column int) {
 		g.Table.GetCell(row, column).SetTextColor(tcell.ColorRed)
 		g.Table.SetSelectable(true, false)
+
+		//get link
+		downloadLink := g.LibgenSearch.GetWebPageOfBooksStruct().Books[row].DownloadLink
+		bookName := g.LibgenSearch.GetWebPageOfBooksStruct().Books[row].Title
+		description := g.LibgenSearch.GetWebPageOfBooksStruct().Books[row].Description
+		modal := tview.NewModal().
+			SetText("Do you want to download \"" + bookName + "\"?\n\n" + description).
+			AddButtons([]string{"Cancel", "Download"}).
+			SetDoneFunc(func(buttonIndex int, buttonLabel string) {
+
+				//if not then close the modal
+				if buttonLabel == "Cancel" {
+					g.App.SetRoot(g.Table, true).Sync().SetFocus(g.Table)
+				}
+				//if yes then download the book
+				if buttonLabel == "Download" {
+					browser.OpenURL(downloadLink)
+
+				}
+			})
+		if err := g.App.SetRoot(modal, false).SetFocus(modal).Run(); err != nil {
+			panic(err)
+		}
+
 	}).SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 
 		switch event.Key() {
@@ -159,5 +185,6 @@ func (g Gui) LibGenSearchFormCreator() {
 		}).
 		AddButton("Quit", func() {
 			g.App.Stop()
+			os.Exit(1)
 		})
 }
