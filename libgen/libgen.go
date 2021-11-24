@@ -5,9 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"math"
+	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -28,6 +31,7 @@ type Book struct {
 	FormatAndSize     string `json:"formatAndSize"`
 	Mirror1           string `json:"mirror1"`
 	DownloadLink      string `json:"downloadLink"`
+	FileName          string `json:"filename"`
 	LinkToDescription string `json:"linkToDescription"`
 	Description       string `json:"description"`
 }
@@ -133,7 +137,7 @@ func (search LibGenSearch) fictionSearch() int {
 	// When a fiction search is made - it always returns 25 results, and there is not way to change that.
 	if search.DoSearch {
 		page := rod.New().MustConnect().MustPage("http://libgen.rs" + *search.Fiction).MustWindowFullscreen()
-		page.MustWaitLoad().MustScreenshot("Fiction.png")
+		defer page.Close()
 		if search.isTestRun() && search.SavePng {
 			page.MustWaitLoad().MustScreenshot("Fiction.png")
 		}
@@ -227,6 +231,7 @@ func (search LibGenSearch) fictionSearch() int {
 func (search LibGenSearch) nonFictionSearch() int {
 	if search.DoSearch {
 		page := rod.New().MustConnect().MustPage("http://libgen.rs" + *search.NonFiction).MustWindowFullscreen()
+		defer page.Close()
 		if search.isTestRun() && search.SavePng {
 			page.MustWaitLoad().MustScreenshot("NonFiction.png")
 		}
@@ -347,6 +352,7 @@ func (search LibGenSearch) nonFictionSearch() int {
 func (search LibGenSearch) scientificSearch() int {
 	if search.DoSearch {
 		page := rod.New().MustConnect().MustPage("http://libgen.rs" + *search.Scientific).MustWindowFullscreen()
+		defer page.Close()
 		if search.isTestRun() && search.SavePng {
 			page.MustWaitLoad().MustScreenshot("Scientific.png")
 		}
@@ -504,10 +510,14 @@ func (search LibGenSearch) getBookDescriptionForNonFiction(ch chan WebPageOfBook
 			defer waitG.Wait()
 			time.Sleep((time.Duration(differentI) * 250) * time.Millisecond)
 			page := rod.New().MustConnect().MustPage()
+			defer page.Close()
 			err := rod.Try(func() {
 				page.Timeout(2 * time.Second).MustNavigate(theBook.Mirror1)
 				download := page.MustElement("#download > h2 > a")
 				search.PobNonFiction.Books[differentI].DownloadLink = fmt.Sprint(download.MustProperty("href"))
+				request, _ := http.NewRequest("GET", search.PobNonFiction.Books[differentI].DownloadLink, nil)
+				urlPathElements := strings.Split(request.URL.Path, "/")
+				search.PobNonFiction.Books[differentI].FileName = urlPathElements[len(urlPathElements)-1]
 				descriptionTbody := page.Timeout(4 * time.Second).MustSearch("tbody")
 				if descriptionTbody != nil {
 					trs := descriptionTbody.MustElements("tr")
@@ -528,9 +538,12 @@ func (search LibGenSearch) getBookDescriptionForNonFiction(ch chan WebPageOfBook
 						}
 					}
 				}
-				search.SaveDownloadLinkToLog(search.PobNonFiction.Books[differentI].Title + " " +
-					search.PobNonFiction.Books[differentI].DownloadLink + " " +
-					search.PobNonFiction.Books[differentI].Description)
+				if os.Getenv("DEBUG") == "1" {
+					search.SaveDownloadLinkToLog(search.PobNonFiction.Books[differentI].Title + " " +
+						search.PobNonFiction.Books[differentI].DownloadLink + " " +
+						search.PobNonFiction.Books[differentI].FileName + " " +
+						search.PobNonFiction.Books[differentI].Description)
+				}
 				ch <- *search.PobNonFiction
 			})
 			if errors.Is(err, context.DeadlineExceeded) {
@@ -555,12 +568,16 @@ func (search LibGenSearch) getBookDescriptionForFiction(ch chan WebPageOfBooks) 
 			defer waitG.Wait()
 			time.Sleep((time.Duration(differentI) * 250) * time.Millisecond)
 			page := rod.New().MustConnect().MustPage()
+			defer page.Close()
 			err := rod.Try(func() {
 				page.Timeout(2 * time.Second).MustNavigate(theBook.Mirror1)
 
 				// #download > h2 > a
 				download := page.MustElement("#download > h2 > a")
 				search.PobFiction.Books[differentI].DownloadLink = fmt.Sprint(download.MustProperty("href"))
+				request, _ := http.NewRequest("GET", search.PobFiction.Books[differentI].DownloadLink, nil)
+				urlPathElements := strings.Split(request.URL.Path, "/")
+				search.PobFiction.Books[differentI].FileName = urlPathElements[len(urlPathElements)-1]
 				descriptionTbody := page.Timeout(4 * time.Second).MustSearch("tbody")
 				if descriptionTbody != nil {
 					trs := descriptionTbody.MustElements("tr")
@@ -581,9 +598,12 @@ func (search LibGenSearch) getBookDescriptionForFiction(ch chan WebPageOfBooks) 
 						}
 					}
 				}
-				search.SaveDownloadLinkToLog(search.PobFiction.Books[differentI].Title + " " +
-					search.PobFiction.Books[differentI].DownloadLink +
-					search.PobFiction.Books[differentI].Description)
+				if os.Getenv("DEBUG") == "1" {
+					search.SaveDownloadLinkToLog(search.PobFiction.Books[differentI].Title + " " +
+						search.PobFiction.Books[differentI].DownloadLink + " " +
+						search.PobFiction.Books[differentI].FileName + " " +
+						search.PobFiction.Books[differentI].Description)
+				}
 				ch <- *search.PobFiction
 			})
 
@@ -648,4 +668,27 @@ func (search LibGenSearch) PreviousPageUpdate() {
 			search.PobScientific.CurrentPageNumber -= 1
 		}
 	}
+}
+
+func (search LibGenSearch) DownloadBook(filename string, url string) {
+	path := ".books"
+	wd, _ := os.Getwd()
+	parent := filepath.Dir(wd)
+	if path != parent {
+		usersHomeDirectory, _ := os.UserHomeDir()
+		os.Chdir(usersHomeDirectory)
+		if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+			err := os.Mkdir(path, os.ModePerm)
+			if err != nil {
+				log.Println(err)
+			}
+		}
+		os.Chdir(path)
+	}
+
+	response, _ := http.Get(url)
+	defer response.Body.Close()
+	output, _ := os.Create(filename)
+	defer output.Close()
+	io.Copy(output, response.Body)
 }
