@@ -164,7 +164,7 @@ func (g Gui) TableCreatorAfterSearch() {
 
 func (g Gui) LibGenSearchFormCreator() {
 	g.Form.
-		AddDropDown("Title", []string{"NonFiction", "Fiction", "Scientific"}, 0, nil).
+		AddDropDown("Genre", []string{"NonFiction", "Fiction", "Scientific"}, 0, nil).
 		AddInputField("Search", "", 20, nil, nil).
 		AddButton("Search", func() {
 			g.LibgenSearch = libgen.New()
