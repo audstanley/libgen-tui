@@ -16,3 +16,9 @@
 
 # Do not include the png files that go-rod creates:
 *.png
+tests/*.png
+# ignore the go-rod html examples for parsing
+*.html
+*.json
+*.log
+rod-logs/

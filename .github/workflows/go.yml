@@ -2,7 +2,7 @@ name: Go
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, audstanley, development  ]
   pull_request:
     branches: [ main ]
 
@@ -22,4 +22,4 @@ jobs:
       run: go build -v ./...
 
     - name: Test
-      run: go test -v ./...
+      run: grc go test -v ./...
