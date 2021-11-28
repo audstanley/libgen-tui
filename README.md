@@ -1,6 +1,8 @@
 # libgen-tui
 A terminal based application for LibGen
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/audstanley/libgen-tui)](https://goreportcard.com/report/github.com/audstanley/libgen-tui)
+
 ## To build the application, install GoLang **or** Download the binary from the [GitHub Releases](https://github.com/audstanley/libgen-tui/releases)
 
 ### Build Process in bash (for Windows/Mac/Linux)
