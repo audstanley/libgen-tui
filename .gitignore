@@ -22,3 +22,4 @@ tests/*.png
 *.json
 *.log
 rod-logs/
+build/*

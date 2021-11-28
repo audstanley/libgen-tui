@@ -6,7 +6,6 @@ import (
 
 	"github.com/audstanley/libgen-tui/libgen"
 	"github.com/gdamore/tcell/v2"
-	"github.com/pkg/browser"
 
 	"github.com/rivo/tview"
 )
@@ -97,22 +96,27 @@ func (g Gui) TableCreatorAfterSearch() {
 		g.Table.SetSelectable(true, false)
 
 		//get link
-		downloadLink := g.LibgenSearch.GetWebPageOfBooksStruct().Books[row].DownloadLink
-		bookName := g.LibgenSearch.GetWebPageOfBooksStruct().Books[row].Title
-		description := g.LibgenSearch.GetWebPageOfBooksStruct().Books[row].Description
+		downloadLink := g.LibgenSearch.GetWebPageOfBooksStruct().Books[row-1].DownloadLink
+		filename := g.LibgenSearch.GetWebPageOfBooksStruct().Books[row-1].FileName
+		bookName := g.LibgenSearch.GetWebPageOfBooksStruct().Books[row-1].Title
+		description := g.LibgenSearch.GetWebPageOfBooksStruct().Books[row-1].Description
+		downloadedTheBook := false
 		modal := tview.NewModal().
 			SetText("Do you want to download \"" + bookName + "\"?\n\n" + description).
-			AddButtons([]string{"Cancel", "Download"}).
+			AddButtons([]string{"Back", "Download"}).
 			SetDoneFunc(func(buttonIndex int, buttonLabel string) {
 
 				//if not then close the modal
-				if buttonLabel == "Cancel" {
+				if buttonLabel == "Back" {
 					g.App.SetRoot(g.Table, true).Sync().SetFocus(g.Table)
 				}
 				//if yes then download the book
 				if buttonLabel == "Download" {
-					browser.OpenURL(downloadLink)
-
+					//browser.OpenURL(downloadLink)
+					if !downloadedTheBook {
+						go g.LibgenSearch.DownloadBook(filename, downloadLink)
+					}
+					downloadedTheBook = true
 				}
 			})
 		if err := g.App.SetRoot(modal, false).SetFocus(modal).Run(); err != nil {
@@ -129,7 +133,9 @@ func (g Gui) TableCreatorAfterSearch() {
 			g.LibgenSearch.ClearAllDataForNextPageSearch()
 			channelLength := g.LibgenSearch.Search(*g.LibgenSearch.SearchType, g.LibgenSearch.GetTitle())
 			channelOfBooks := make(chan libgen.WebPageOfBooks, channelLength)
-			g.LibgenSearch.SaveDownloadLinkToLog(strconv.Itoa(channelLength))
+			if os.Getenv("DEBUG") == "1" {
+				g.LibgenSearch.SaveDownloadLinkToLog(strconv.Itoa(channelLength))
+			}
 			g.LibgenSearch.GetBookDescription(channelOfBooks)
 
 			for i := 0; i < channelLength; i++ {
@@ -145,7 +151,9 @@ func (g Gui) TableCreatorAfterSearch() {
 			g.LibgenSearch.ClearAllDataForNextPageSearch()
 			channelLength := g.LibgenSearch.Search(*g.LibgenSearch.SearchType, g.LibgenSearch.GetTitle())
 			channelOfBooks := make(chan libgen.WebPageOfBooks, channelLength)
-			g.LibgenSearch.SaveDownloadLinkToLog(strconv.Itoa(channelLength))
+			if os.Getenv("DEBUG") == "1" {
+				g.LibgenSearch.SaveDownloadLinkToLog(strconv.Itoa(channelLength))
+			}
 			g.LibgenSearch.GetBookDescription(channelOfBooks)
 
 			for i := 0; i < channelLength; i++ {
@@ -164,7 +172,7 @@ func (g Gui) TableCreatorAfterSearch() {
 
 func (g Gui) LibGenSearchFormCreator() {
 	g.Form.
-		AddDropDown("Genre", []string{"NonFiction", "Fiction", "Scientific"}, 0, nil).
+		AddDropDown("Genre", []string{"NonFiction", "Fiction"}, 0, nil).
 		AddInputField("Search", "", 20, nil, nil).
 		AddButton("Search", func() {
 			g.LibgenSearch = libgen.New()
@@ -173,7 +181,9 @@ func (g Gui) LibGenSearchFormCreator() {
 			channelLength := g.LibgenSearch.Search(searchType, query)
 			// Create a buffered channel for the Page of books
 			channelOfBooks := make(chan libgen.WebPageOfBooks, channelLength)
-			g.LibgenSearch.SaveDownloadLinkToLog(strconv.Itoa(channelLength))
+			if os.Getenv("DEBUG") == "1" {
+				g.LibgenSearch.SaveDownloadLinkToLog(strconv.Itoa(channelLength))
+			}
 			go g.LibgenSearch.GetBookDescription(channelOfBooks)
 
 			for i := 0; i < channelLength; i++ {
