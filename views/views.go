@@ -197,4 +197,5 @@ func (g Gui) LibGenSearchFormCreator() {
 			g.App.Stop()
 			os.Exit(1)
 		})
+	g.Form.SetFooter("↑/↓ Navigate | Enter Select | Esc Quit")
 }
